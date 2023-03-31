@@ -9,116 +9,108 @@ import (
 	"os"
 )
 
-var (
-	Token     string
-	BotPrefix string
-
-	config *configStruct
-)
-
-type configStruct struct {
-	Token     string `json:"Token"`
-	BotPrefix string `json:"Bot_prefix"`
-}
-
-func ReadConfig() error {
-	fmt.Println("reading config file...")
-	file, err := os.ReadFile("./config.json")
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return err
-	}
-
-	//fmt.Println(string(file))
-
-	err = json.Unmarshal(file, &config)
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return err
-	}
-
-	Token = config.Token
-	BotPrefix = config.BotPrefix
-
-	return nil
-}
-
-func Warframe() {
-	resp, err := http.Get("https://api.warframestat.us/pc/voidTrader")
-	if err != nil {
-		fmt.Println("No response from request")
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-
-	var result BaroJson
-	if err := json.Unmarshal(body, &result); err != nil {
-		fmt.Println("Can not unmarshal JSON")
-	}
-
-	fmt.Println(result.Character)
-	//return result.Character
-}
-
-var BotId string
-var GoBot *discordgo.Session
-
-func Start() {
-	GoBot, err := discordgo.New("Bot " + config.Token)
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	u, err := GoBot.User("@me")
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	BotId = u.ID
-
-	GoBot.AddHandler(messageCreate)
-
-	err = GoBot.Open()
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Bot is runnning !")
-}
-
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == BotId {
-		return
-	}
-
-	if m.Content == BotPrefix+"hello" {
-		_, _ = s.ChannelMessageSend(m.ChannelID, "Ordis vous dit bonjour !")
-	}
-
-	if m.Content == BotPrefix+"Baro" {
-		Warframe()
-
-	}
-}
+//func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+//	if m.Author.ID == BotId {
+//		return
+//	}
+//
+//	if m.Content == BotPrefix+"hello" {
+//		_, _ = s.ChannelMessageSend(m.ChannelID, "Ordis vous dit bonjour !")
+//	}
+//
+//	if m.Content == BotPrefix+"baro" {
+//		resp, err := http.Get("https://api.warframestat.us/pc/voidTrader")
+//		if err != nil {
+//			fmt.Println("No response from request")
+//		}
+//		defer func(Body io.ReadCloser) {
+//			err := Body.Close()
+//			if err != nil {
+//				fmt.Println(err)
+//			}
+//		}(resp.Body)
+//		body, err := io.ReadAll(resp.Body)
+//
+//		var B bin.BaroJson
+//		if err := json.Unmarshal(body, &B); err != nil {
+//			fmt.Println("Can not unmarshal JSON")
+//		}
+//		if B.Active == false {
+//			//fmt.Println(B.Character + "\n" + B.Location)
+//			//fmt.Println(B.Inventory)
+//			embed := &discordgo.MessageEmbed{
+//				Author: &discordgo.MessageEmbedAuthor{},
+//				Title:  B.Character,
+//				Color:  0x7a00ff,
+//				Thumbnail: &discordgo.MessageEmbedThumbnail{
+//					URL: "https://n9e5v4d8.ssl.hwcdn.net/uploads/663c26145b1654c2264392a09568b5c2.png",
+//				},
+//				Fields: []*discordgo.MessageEmbedField{
+//					{
+//						Name: "~~",
+//					},
+//					{
+//						Name:  "Location:",
+//						Value: B.Location,
+//					},
+//					{
+//						Name:   "Start in :",
+//						Value:  B.StartString,
+//						Inline: true,
+//					},
+//					{
+//						Name:   "End in :",
+//						Value:  B.EndString,
+//						Inline: true,
+//					},
+//					{
+//						Name: "~~",
+//					},
+//					{
+//						Name: "Inventory : ",
+//					},
+//					{
+//						Name:   "Start in :",
+//						Value:  B.StartString,
+//						Inline: true,
+//					},
+//				},
+//			}
+//			sendEmbed, err := s.ChannelMessageSendEmbed(m.ChannelID, embed)
+//			if err != nil {
+//				return
+//			}
+//		} else {
+//			fmt.Println("Baro Ki'teer got problem on the road")
+//		}
+//	}
+//}
 
 func main() {
-	err := ReadConfig()
+	var ordis bin.Ordis
+	var err error
+	ordis.Config.ReadFile()
+	ordis.Session, err = discordgo.New("Bot " + ordis.Config.BotToken)
+	ordis.Session.Identify.Intents = discordgo.IntentsAll
 
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		fmt.Println(err)
 	}
 
-	Start()
+	err = ordis.Session.Open()
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	<-make(chan struct{})
-	return
+	ordis.InitSlashCommands()
+	ordis.InitSlashCommandsHandlers()
+
+	defer ordis.Session.Close()
+
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	<-sc
+	if err != nil {
+		fmt.Println(err)
+	}
 }

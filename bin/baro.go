@@ -1,8 +1,8 @@
-package main
+package bin
 
 import "time"
 
-type BaroJson struct {
+type BaroData struct {
 	ID           string    `json:"id"`
 	Activation   time.Time `json:"activation"`
 	StartString  string    `json:"startString"`
