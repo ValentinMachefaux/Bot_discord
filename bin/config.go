@@ -6,10 +6,6 @@ import (
 	"os"
 )
 
-// Config est la Structure de la configuration du Bot
-// Champs obligatoires de la conf :
-//   - BotToken [string]
-//   - GuildId [string] (optional)
 type Config struct {
 	BotToken string `yaml:"botToken"`
 	GuildId  string `yaml:"guildId"`
